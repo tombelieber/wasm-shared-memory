@@ -1,21 +1,24 @@
+use js_sys::Date;
 use wasm_bindgen::prelude::*;
 
-// Define a struct with 10 fields.
-// With #[repr(C)], the layout is predictable. On wasm32,
-// the u32 (4 bytes) is followed by 4 bytes of padding to align the f64s.
+// Define a struct with 11 fields.
+// With #[repr(C)], we get a predictable layout.
+// On wasm32, the u32 field (4 bytes) is followed by 4 bytes of padding,
+// then 10 f64 fields (10 * 8 = 80 bytes). Total = 4 + 4 + 80 = 88 bytes.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct MyObject {
-    pub id: u32,    // 4 bytes
-    pub value: f64, // 8 bytes
-    pub a: f64,     // 8 bytes
-    pub b: f64,     // 8 bytes
-    pub c: f64,     // 8 bytes
-    pub d: f64,     // 8 bytes
-    pub e: f64,     // 8 bytes
-    pub f: f64,     // 8 bytes
-    pub g: f64,     // 8 bytes
-    pub h: f64,     // 8 bytes
+    pub id: u32,      // 4 bytes
+    pub value: f64,   // 8 bytes
+    pub a: f64,       // 8 bytes
+    pub b: f64,       // 8 bytes
+    pub c: f64,       // 8 bytes
+    pub d: f64,       // 8 bytes
+    pub e: f64,       // 8 bytes
+    pub f: f64,       // 8 bytes
+    pub g: f64,       // 8 bytes
+    pub h: f64,       // 8 bytes
+    pub time_ms: f64, // 8 bytes (to be updated)
 }
 
 // Global storage for our objects.
@@ -37,6 +40,7 @@ pub fn populate_objects() {
             8.8,  // h
         );
         // Populate with 10,000 objects with id equal to the index.
+        // time_ms is initially set to 0.
         OBJECTS = Some(
             (0..10_000)
                 .map(|i| MyObject {
@@ -50,9 +54,23 @@ pub fn populate_objects() {
                     f: template.6,
                     g: template.7,
                     h: template.8,
+                    time_ms: 0.0,
                 })
                 .collect(),
         );
+    }
+}
+
+/// Update each object's time_ms field to the current time in milliseconds.
+#[wasm_bindgen]
+pub fn update_time() {
+    let now = Date::now(); // returns f64 milliseconds
+    unsafe {
+        if let Some(ref mut vec) = OBJECTS {
+            for obj in vec.iter_mut() {
+                obj.time_ms = now;
+            }
+        }
     }
 }
 
@@ -77,11 +95,7 @@ pub fn get_memory() -> wasm_bindgen::JsValue {
 }
 
 /// Export the size (in bytes) of MyObject.
-/// With the given layout:
-/// - id: u32 → 4 bytes
-/// - padding: 4 bytes (to align the following f64 fields)
-/// - 9 × f64: 9 * 8 = 72 bytes
-/// Total = 4 + 4 + 72 = 80 bytes.
+/// With the layout described above, the size is 88 bytes.
 #[wasm_bindgen]
 pub fn get_object_size() -> usize {
     std::mem::size_of::<MyObject>()
